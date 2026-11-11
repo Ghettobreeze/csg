@@ -113,15 +113,18 @@
   async function dayComplete() {
     {
       if (GS.s.day >= GS.T.total_days) return finish("win");
-      await sleep(0.4);
+      UI.system("🌙 Day " + GS.s.day + " is winding down…");
+      await sleep(2.5);
       const offer = GS.day_offer();
       const getPick = UI.summary(GS.s, GS.day_deltas(), GS.flavor_line(), offer);
       $("btn-next-day").onclick = async () => {
         $("btn-next-day").onclick = null;
         GS.take_powerup(getPick()); UI.hideSummary();
-        await play(GS.roll_day());
+        GS.roll_day();
         if (await ended()) return;
-        refresh(true); loop();
+        refresh(true);
+        await sleep(1.2);
+        loop();
       };
     }
   }
