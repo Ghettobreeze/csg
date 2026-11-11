@@ -10,10 +10,10 @@ CSG_DATA.tuning = {
   "danger_high": 80,
 
   "effect_scale_day1": 1.0,
-  "effect_scale_day30": 1.55,
+  "effect_scale_day30": 1.5,
   "overnight_reversion": 0.03,
 
-  "drama_cooldown": 7,
+  "drama_cooldown": 6,
   "clout_fade": 2,
   "members_healthy_gain": 1,
   "members_unhealthy_loss": 2,
@@ -58,6 +58,7 @@ CSG_DATA.tuning = {
   "lurker_messages": 45,
 
   "powerup_max": 3,
+  "powerup_offer_every": 3,
   "powerup_spicy_chance": 0.15,
   "powerup_starting": 2,
   "powerup_starters": ["peace_gif", "meme_drop", "invite_cousins", "delete_pray"],

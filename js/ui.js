@@ -182,7 +182,7 @@
       }
       $("summary-flavor").textContent = flavor;
       const wrap = $("offer-wrap"), box = $("offers"); box.innerHTML = "";
-      wrap.hidden = !offer || !offer.length;
+      wrap.hidden = false;
       let picked = offer && offer[0];
       (offer || []).forEach((id, i) => {
         const P = GameState.C.powerups[id], o = el("div", "offer" + (i === 0 ? " picked" : ""));
@@ -190,7 +190,9 @@
         o.onclick = () => { box.querySelectorAll(".offer").forEach(x => x.classList.remove("picked")); o.classList.add("picked"); picked = id; };
         box.append(o);
       });
-      if (offer && offer.length) {
+      if (!offer || !offer.length) {
+        wrap.querySelector(".offer-title").textContent = "⚡ Next power-up pick: after Day " + GameState.next_offer_day();
+      } else {
         const full = s.powerups.length >= GameState.T.powerup_max;
         $("offer-wrap").querySelector(".offer-title").textContent = full ? "⚡ Pick a power-up (replaces your oldest)" : "⚡ Pick a power-up";
       }

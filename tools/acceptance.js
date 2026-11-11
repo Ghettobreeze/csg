@@ -143,5 +143,15 @@ check("Exactly " + T.moments_per_day + " reply moments per day", n + 1 === T.mom
 fresh(); G.start_moment(); const saved = JSON.stringify(G.s); G.s = null; G.load_save();
 check("Save + resume restores the run mid-day", G.s && JSON.stringify(G.s) === saved);
 
+// Power-up economy
+fresh(); G.s.day = 2; const o2 = G.day_offer(); G.s.day = 3; const o3 = G.day_offer();
+check("Power-up pick only every " + T.powerup_offer_every + "rd night", o2.length === 0 && o3.length === 2);
+fresh(); G.s.day = 3; G.s.meters.drama = 85; G.s.meters.sanity = 50; G.s.meters.clout = 50; G.s.meters.members = 50;
+check("Nightly pick targets the worst meter (high drama -> Peace Gif)", G.day_offer()[0] === "peace_gif");
+fresh(); G.s.day = 3; G.s.meters.drama = 75; G.s.meters.clout = 10;
+check("Nightly pick won't offer a fix that backfires (no Stir the Pot when drama is hot)", G.day_offer()[0] !== "stir_pot");
+fresh(); G.s.meters.drama = 50; G.s.meters.clout = 30; G.s.powerups = ["stir_pot"]; G.use_powerup("stir_pot");
+check("Stir the Pot: Drama +15, Clout +15", G.s.meters.drama === 65 && G.s.meters.clout === 45);
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

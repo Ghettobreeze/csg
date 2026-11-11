@@ -427,9 +427,30 @@
       s.powerups.push(id);
       return [{ type: "system", text: text + " " + this.C.powerups[id].icon + " " + this.C.powerups[id].name }, { type: "powerup", id }, { type: "sound", name: "power" }];
     },
+    // Would this power-up push some other meter into the red right now?
+    powerup_backfires(id) {
+      const fx = (this.C.powerups[id] || {}).fx || {}, k = this.scale(), T = this.T;
+      return Object.entries(fx).some(([m, v]) => { const now = this.s.meters[m], after = now + v * k;
+        return (v > 0 && after >= T.danger_high && after > now) || (v < 0 && after <= T.danger_low && after < now); });
+    },
+    needed_powerup(list) {
+      const s = this.s, m = s.meters, want = [];
+      if (s.hidden.strikes >= 2) want.push([90, "summon_bigbro"]);
+      if (s.hidden.leak >= 60) want.push([s.hidden.leak, "delete_pray"]);
+      want.push([m.drama, "peace_gif"], [100 - m.drama, "stir_pot"], [100 - m.sanity, "meme_drop"], [100 - m.sanity, "call_auntie"],
+        [m.clout, "humble_post"], [100 - m.clout, "stir_pot"], [100 - m.members, "invite_cousins"]);
+      want.sort((x, y) => y[0] - x[0]);
+      const hit = want.find(([, id]) => list.includes(id) && !this.powerup_backfires(id));
+      return hit ? hit[1] : null;
+    },
+    offer_due(day) { const n = this.T.powerup_offer_every || 1; return day % n === 0; },
+    next_offer_day() { let d = this.s.day + 1; while (!this.offer_due(d)) d++; return d; },
     day_offer() {
+      if (!this.offer_due(this.s.day)) return [];
       const list = this.unlocked_list().slice();
-      const a = list.splice(Math.floor(this.rand() * list.length), 1)[0];
+      // First choice answers whatever is closest to killing you; the second is a wildcard.
+      const fix = this.needed_powerup(list);
+      const a = fix ? list.splice(list.indexOf(fix), 1)[0] : list.splice(Math.floor(this.rand() * list.length), 1)[0];
       const b = list.length ? list[Math.floor(this.rand() * list.length)] : null;
       return b ? [a, b] : [a];
     },
@@ -448,25 +469,24 @@
       ev.push({ type: "you", text: P.icon + " " + P.say, act: false, powerup: true }, { type: "sound", name: "power" });
       let consumed = false;
       const pk = this.scale();
-      const meter = (m, v) => this.meter(m, v * pk);
+      for (const [m, v] of Object.entries(P.fx || {})) this.meter(m, v * pk);
       switch (id) {
         case "peace_gif":
-          meter("drama", -25);
           if (s.combo > 0) { s.combo = 0; s.combo_cd = s.turn + 6; this.count("combos_defused"); ev.push({ type: "system", text: "🕊️ Combo defused." }); }
           if (s.war > 0) { s.war = 0; ev.push({ type: "system", text: "🕊️ Even Coach and Debra stopped to look at the gif. War over." }); }
           if (this.active("pookie")) this.post(ev, "pookie", "wat is dis gif 😭");
           break;
-        case "stir_pot": meter("drama", 25); meter("clout", 10); this.post(ev, "catfish", "OH it's about to be a LONG night 🍿"); break;
-        case "meme_drop": meter("sanity", 20); meter("drama", -10); this.post(ev, "catfish", "LMAOOO who made this 💀💀"); break;
-        case "invite_cousins": meter("members", 20); ev.push({ type: "system", text: "📣 6 of your cousins joined the group. One already has an opinion." }); break;
-        case "humble_post": meter("clout", -20); this.post(ev, "auntiepat", "Look at you being humble 🌺 proud of you baby"); break;
+        case "stir_pot": this.post(ev, "catfish", "OH it's about to be a LONG night 🍿"); break;
+        case "meme_drop": this.post(ev, "catfish", "LMAOOO who made this 💀💀"); break;
+        case "invite_cousins": ev.push({ type: "system", text: "📣 6 of your cousins joined the group. One already has an opinion." }); break;
+        case "humble_post": this.post(ev, "auntiepat", "Look at you being humble 🌺 proud of you baby"); break;
         case "summon_bigbro":
           if (s.hidden.strikes > 0) s.hidden.strikes -= 1;
           if (s.war > 0) s.war = 0;
           this.post(ev, "bigbro", "Y'all heard me. Everybody chill. Strike erased, war over. 🎤", { kind: "signature", badge: "🎤 BIG BRO" });
           break;
         case "call_auntie":
-          s.hidden.saint_heat = 0; meter("sanity", 10); this.count("auntie_calls");
+          s.hidden.saint_heat = 0; this.count("auntie_calls");
           this.post(ev, "auntiepat", "Saint. Baby. ENOUGH. Your mother is in this group. 🌺🌺🌺", { kind: "signature", badge: "🌺 AUNTIE PAT" });
           if (this.active("section8")) this.post(ev, "section8", "...yes ma'am.");
           break;

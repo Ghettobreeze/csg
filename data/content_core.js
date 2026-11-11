@@ -7,13 +7,13 @@ globalThis.CSG_DATA = globalThis.CSG_DATA || {};
 CSG_DATA.threads = CSG_DATA.threads || [];
 CSG_DATA.core = {
   "powerups": {
-    "peace_gif":      {"icon": "🕊️", "name": "Peace Gif",        "desc": "Drama -25. Stops combos and wars.", "say": "[posts the peace gif]"},
-    "meme_drop":      {"icon": "😂", "name": "Meme Drop",        "desc": "Sanity +20, Drama -10.", "say": "[drops a meme so good everybody forgets the argument]"},
-    "invite_cousins": {"icon": "📣", "name": "Invite the Cousins","desc": "Members +20.", "say": "[adds 6 cousins to the group]"},
+    "peace_gif":      {"icon": "🕊️", "name": "Peace Gif",        "desc": "Drama -25. Stops combos and wars.", "fx": {"drama": -25}, "say": "[posts the peace gif]"},
+    "meme_drop":      {"icon": "😂", "name": "Meme Drop",        "desc": "Sanity +20, Drama -10.", "fx": {"sanity": 20, "drama": -10}, "say": "[drops a meme so good everybody forgets the argument]"},
+    "invite_cousins": {"icon": "📣", "name": "Invite the Cousins","desc": "Members +20.", "fx": {"members": 20}, "say": "[adds 6 cousins to the group]"},
     "delete_pray":    {"icon": "🙏", "name": "Delete & Pray",    "desc": "Leak -30.", "say": "[deletes everything spicy and prays]"},
-    "stir_pot":       {"icon": "🔥", "name": "Stir the Pot",     "desc": "Drama +25, Clout +10. Saves a dying group.", "say": "So... who's gonna tell Marcus what Brittany said about him?"},
-    "humble_post":    {"icon": "🫥", "name": "Humble Post",      "desc": "Clout -20. For when you're too popular.", "say": "Honestly y'all are funnier than me. I'm just here to learn. 🙏"},
-    "call_auntie":    {"icon": "🌺", "name": "Call Auntie Pat",  "desc": "Calms the Saint, Sanity +10.", "say": "@Auntie Pat please come get your nephew"},
+    "stir_pot":       {"icon": "🔥", "name": "Stir the Pot",     "desc": "Drama +15, Clout +15. Saves a dying group.", "fx": {"drama": 15, "clout": 15}, "say": "So... who's gonna tell Marcus what Brittany said about him?"},
+    "humble_post":    {"icon": "🫥", "name": "Humble Post",      "desc": "Clout -20. For when you're too popular.", "fx": {"clout": -20}, "say": "Honestly y'all are funnier than me. I'm just here to learn. 🙏"},
+    "call_auntie":    {"icon": "🌺", "name": "Call Auntie Pat",  "desc": "Calms the Saint, Sanity +10.", "fx": {"sanity": 10}, "say": "@Auntie Pat please come get your nephew"},
     "summon_bigbro":  {"icon": "🎤", "name": "Summon Big Bro",   "desc": "Erases a strike, ends a war.", "say": "@Big Bro we need you"},
     "kimmy_favor":    {"icon": "🏡", "name": "Kimmy's Favor",    "desc": "Unmutes you, Kimmy loves you more.", "say": "Kimmy, I'll refer my cousin to you if you unmute me 🙏"},
     "go_dark":        {"icon": "👻", "name": "Go Dark",          "desc": "Skip this one. Meters drift toward the middle. Clout drops.", "say": "[puts the phone face down]"}

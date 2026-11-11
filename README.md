@@ -7,7 +7,7 @@ Live: https://ghettobreeze.github.io/csg/
 - Survive 30 days, 4 reply moments a day. Keep Drama, Clout, Sanity and Members away from 0 **and** 100.
 - 16-second reply timer (24s on your first run). Too slow and the group picks the worst reply for you.
 - Effects ramp up from x1.0 on day 1 to x1.55 on day 30. Arguing drains Sanity, checking out restores it.
-- Power-ups (max 3): earn one per day (pick 1 of 2), plus a chance on spicy replies. 4 starters; 6 more unlock at best days 5/10/15/20/25/30.
+- Power-ups (max 3): pick 1 of 2 every 3rd night (one choice always targets your worst meter), plus a chance on spicy replies. 4 starters; 6 more unlock at best days 5/10/15/20/25/30.
 - Daily Run (same seed for everyone that day) and Free Play, each with its own best. Save/resume, share results, 26 achievements.
 
 ## Edit content
