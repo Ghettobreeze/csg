@@ -39,3 +39,28 @@ Power-up effects now live in `data/content_core.js` (`fx`) instead of being hard
 | strategic | 80.4% | 81.7% | 10.5 | 2.5–4.6 | 4.1–5.8 |
 
 Power-ups still decide the game: casual players win about 4x as often as players who ignore them. Supply dropped from ~22 to ~9 per run, so spammers now run dry; with everything unlocked, the eager bot does worse than casual. Meters move ~5.5 points per moment, about the same as before.
+
+## Pass 2: even causes of death (Nov 11)
+Casual players died of Drama 64%, Clout 18%, Members 11% and Sanity 7%. The content leans on Drama: of 529 reply choices, 376 move Drama (133 by 12+), but only 167 touch Sanity, and 125 of those raise it. Sanity only drained slowly, so players always fixed it in time.
+
+The goal is Drama, Clout and Sanity at about a third of deaths each, with Members as a smaller share. I picked the settings with a random search and grid search over 8 values (`casual` bot, both profiles).
+
+| Setting | Before | After |
+|---|---|---|
+| `sanity_per_drama` (new) | – | 0.25: a reply that raises Drama also costs that much × 0.25 Sanity ("arguing drains you") |
+| `clout_fade` | 2 | 2.5 (fractional fades now alternate 2/3) |
+| `combo_drama` | 20 | 14 |
+| `war_drama` | 3 | 2 |
+| `members_unhealthy_loss` | 2 | 1 |
+| `effect_scale_day30` | 1.5 | 1.4 |
+
+### Results (2000 runs, seed 2026)
+| Bot | Win, starters | Deaths D / C / S / M | Win, all unlocked | Deaths D / C / S / M |
+|---|---|---|---|---|
+| no_powerups | 2.5% | 17 / 17 / 52 / 14 | 2.9% | 18 / 17 / 51 / 14 |
+| **casual** | **29.2%** | **30 / 29 / 27 / 14** | **33.5%** | **30 / 25 / 34 / 11** |
+| sloppy | 21.5% | 50 / 20 / 21 / 9 | 23.1% | 48 / 19 / 27 / 6 |
+| eager | 31.3% | 33 / 27 / 39 / 1 | 27.4% | 32 / 20 / 43 / 5 |
+| strategic | 87.2% | 23 / 39 / 13 / 25 | 90.8% | 24 / 35 / 21 / 20 |
+
+Side effects: meters spend more time in the red (casual 3.6% → 5.9%), and ignoring power-ups is now nearly hopeless (2.5% wins). Power-up supply is unchanged (~9 per run).

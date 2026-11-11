@@ -153,5 +153,11 @@ check("Nightly pick won't offer a fix that backfires (no Stir the Pot when drama
 fresh(); G.s.meters.drama = 50; G.s.meters.clout = 30; G.s.powerups = ["stir_pot"]; G.use_powerup("stir_pot");
 check("Stir the Pot: Drama +15, Clout +15", G.s.meters.drama === 65 && G.s.meters.clout === 45);
 
+// Death balance mechanics
+fresh(); G.start_moment(); { const d = G.s.current, c = { label: "x", effects: { drama: 12 } }; const before = G.s.meters.sanity; G.apply_choice(d, c);
+check("Arguing drains sanity (drama +12 reply costs extra sanity)", G.s.meters.sanity === before + T.default_say_sanity - Math.round(12 * T.sanity_per_drama)); }
+fresh(); { const c0 = G.s.meters.clout; G.end_moment(); G.end_moment(); G.end_moment(); G.end_moment();
+check("Clout fades " + T.clout_fade + " per moment on average", c0 - G.s.meters.clout === 4 * T.clout_fade || Math.abs((c0 - G.s.meters.clout) - 4 * T.clout_fade) <= 1); }
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

@@ -285,6 +285,8 @@
       const eff = Object.assign({}, c.effects);
       if (eff.sanity === undefined) eff.sanity = c.act ? T.default_act_sanity : T.default_say_sanity;
       if (c.spicy && eff.members === undefined) eff.members = T.default_spicy_members;
+      // Getting into it costs you mentally: a reply that stirs up drama drains your sanity too.
+      if ((eff.drama || 0) > 0) eff.sanity -= Math.round(eff.drama * (T.sanity_per_drama || 0));
       if (d.sig === "princess_take" && s.princess_meaner > 0) {
         for (const m of ["drama", "clout"]) if (eff[m]) eff[m] = Math.round(eff[m] * (1 + 0.5 * s.princess_meaner));
         s.princess_meaner = 0;
@@ -525,7 +527,8 @@
       s.turn += 1; s.moment += 1;
       const m = s.meters;
       this.meter("drama", -T.drama_cooldown);
-      this.meter("clout", -T.clout_fade);
+      // Fractional fade (e.g. 2.5) alternates between 2 and 3 so the average is exact.
+      this.meter("clout", -(Math.floor(s.turn * T.clout_fade) - Math.floor((s.turn - 1) * T.clout_fade)));
       const [lo, hi] = T.members_healthy_band;
       this.meter("members", m.drama >= lo && m.drama <= hi ? T.members_healthy_gain : -T.members_unhealthy_loss, m.drama > hi ? "princess" : null);
       let stress = 0;

@@ -10,13 +10,13 @@ CSG_DATA.tuning = {
   "danger_high": 80,
 
   "effect_scale_day1": 1.0,
-  "effect_scale_day30": 1.5,
+  "effect_scale_day30": 1.4,
   "overnight_reversion": 0.03,
 
   "drama_cooldown": 6,
-  "clout_fade": 2,
+  "clout_fade": 2.5,
   "members_healthy_gain": 1,
-  "members_unhealthy_loss": 2,
+  "members_unhealthy_loss": 1,
   "members_healthy_band": [30, 70],
   "stress_drama_start": 60,
   "stress_per_drama_point": 0.14,
@@ -26,6 +26,7 @@ CSG_DATA.tuning = {
   "default_say_sanity": -3,
   "default_act_sanity": 3,
   "default_spicy_members": -2,
+  "sanity_per_drama": 0.25,
 
   "leak_per_spicy": 12,
   "leak_decay_per_day": 6,
@@ -43,9 +44,9 @@ CSG_DATA.tuning = {
   "reply_timer_first_run_seconds": 24,
 
   "war_turns": 3,
-  "war_drama": 3,
+  "war_drama": 2,
   "combo_window": 2,
-  "combo_drama": 20,
+  "combo_drama": 14,
   "fury_turns": 3,
   "fury_drama": 3,
   "saint_heat_dogpile": 5,

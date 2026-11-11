@@ -41,6 +41,7 @@ function risk(c) {
   let r = 0;
   const eff = Object.assign({}, c.effects);
   if (eff.sanity === undefined) eff.sanity = c.act ? T.default_act_sanity : T.default_say_sanity;
+  if ((eff.drama || 0) > 0) eff.sanity -= Math.round(eff.drama * (T.sanity_per_drama || 0));
   for (const m of METERS) {
     const v = s.meters[m] + (eff[m] || 0) * k;
     r += Math.pow(v - 50, 2) + (v <= 10 || v >= 90 ? 4000 : 0);
@@ -164,6 +165,8 @@ for (const name of Object.keys(BOTS)) {
     time_near_death: +(100 * agg.extreme / Math.max(1, agg.moments * 4)).toFixed(1),
     deaths_by_phase: agg.phase,
     ends: agg.ends,
+    death_share: (() => { const g = {}, tot = N - agg.wins; for (const [k, v] of Object.entries(agg.ends)) { const m = k.split("_")[0]; const key = ["drama", "clout", "sanity", "members"].includes(m) ? m : "other"; g[key] = (g[key] || 0) + v; }
+      for (const k in g) g[k] = Math.round(100 * g[k] / Math.max(1, tot)); return g; })(),
     uses_by_type: agg.ids,
     died_soon_after: agg.killers
   };
@@ -174,7 +177,7 @@ for (const name of Object.keys(BOTS)) {
   console.log("  power-ups: earned " + r.earned_per_run + "/run (start " + r.earned.start + ", nightly " + r.earned.nightly + ", viral " + r.earned.viral + ")"
     + " | used " + r.used_per_run + " (" + r.used_per_10_days + " per 10 days, " + r.used_in_wins + " in wins) | lost to full hand " + r.wasted_full_hand + " | held at end " + r.held_at_end);
   console.log("  meters: avg move " + r.meter_move_per_moment + "/moment | time in red " + r.time_in_red + "% | near death " + r.time_near_death + "%");
-  console.log("  deaths: " + JSON.stringify(r.ends));
+  console.log("  deaths: " + JSON.stringify(r.ends) + "\n  death share %: " + JSON.stringify(r.death_share));
   if (r.used_per_run) console.log("  uses: " + JSON.stringify(r.uses_by_type) + "\n  died within 2 moments of using: " + JSON.stringify(r.died_soon_after));
 }
 if (JSON_OUT) console.log(JSON.stringify(out));
