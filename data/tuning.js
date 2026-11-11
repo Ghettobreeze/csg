@@ -37,10 +37,10 @@ CSG_DATA.tuning = {
 
   "max_signatures_per_day": 2,
   "ambient_per_moment": [1, 2],
-  "typing_seconds": 0.55,
-  "reveal_seconds": 0.3,
-  "reply_timer_seconds": 8,
-  "reply_timer_first_run_seconds": 12,
+  "typing_seconds": 1.1,
+  "reveal_seconds": 0.5,
+  "reply_timer_seconds": 16,
+  "reply_timer_first_run_seconds": 24,
 
   "war_turns": 3,
   "war_drama": 3,

@@ -53,8 +53,8 @@
       if (e.type === "post") {
         UI.typing(e.speaker); await sleep(GS.T.typing_seconds); if (my !== token) return;
         UI.untype(); UI.bubble(e); Sound.play("pop"); await sleep(GS.T.reveal_seconds);
-      } else if (e.type === "you") { UI.you(e); Sound.play("send"); await sleep(0.2); }
-      else if (e.type === "system") { UI.system(e.text); await sleep(0.4); }
+      } else if (e.type === "you") { UI.you(e); Sound.play("send"); await sleep(0.5); }
+      else if (e.type === "system") { UI.system(e.text); await sleep(0.8); }
       else if (e.type === "shake") UI.shake(e.strength);
       else if (e.type === "react") UI.reactions(e.count);
       else if (e.type === "sound") Sound.play(e.name);

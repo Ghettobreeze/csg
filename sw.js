@@ -1,5 +1,5 @@
 // CSG offline cache. Bump VERSION whenever game files change so players get the update.
-const VERSION = "csg-v3-1";
+const VERSION = "csg-v3-2";
 const FILES = ["./", "index.html", "css/style.css", "manifest.webmanifest",
   "data/tuning.js", "data/characters.js", "data/content_core.js", "data/threads_gender.js", "data/threads_politics.js",
   "data/threads_crew.js", "data/threads_more.js", "data/end_states.js",
