@@ -1,130 +1,136 @@
-// Content audit + balance simulator. Run from the CSG folder:  node tools/sim.js [runs]
+// Content audit + balance simulator.  node tools/sim.js [runs] [--all-unlocked]
 const path = require("path");
 const base = path.join(__dirname, "..");
-for (const f of ["data/tuning.js", "data/characters.js", "data/messages.js", "data/end_states.js"]) require(path.join(base, f));
+const files = ["data/tuning.js", "data/characters.js", "data/content_core.js", "data/threads_gender.js",
+  "data/threads_politics.js", "data/threads_crew.js", "data/threads_more.js", "data/end_states.js"];
+const fs = require("fs");
+for (const f of files) if (fs.existsSync(path.join(base, f))) require(path.join(base, f));
 const GS = require(path.join(base, "js/game_state.js"));
 GS.load_data();
+const D = globalThis.CSG_DATA;
+const N = parseInt(process.argv[2] || "1000", 10);
+const ALL = process.argv.includes("--all-unlocked");
 
-// ---------- content audit ----------
-const D = globalThis.CSG_DATA, errors = [];
-const decs = D.messages.decisions, sigs = D.messages.signature_decisions;
-const chars = D.characters.characters, ids = new Set(chars.map(c => c.id));
-const core = chars.filter(c => !c.bench).map(c => c.id);
-const okKeys = new Set(["drama", "clout", "sanity", "members", "leak", "admin_strikes", "council_anger",
-  "bigmike_escalation", "bossbabe_recruit_progress", "reveal_secret", "defend", "kimmy", "offense",
-  "princess_meaner", "marcus_call", "fury", "beef"]);
-const seenIds = new Set();
-const featureCount = {}; core.forEach(c => featureCount[c] = 0);
-const arcs = { princess: 0, mcman_pookie: 0, saint: 0, political: 0 };
-function checkCard(card, where) {
-  if (!ids.has(card.speaker)) errors.push(where + ": unknown speaker " + card.speaker);
-  for (const s of [card.text].concat(card.variants || [])) if (s && s.length >= 240) errors.push(where + ": text >= 240 chars");
-  if (card.choices.length < 2 || card.choices.length > 3) errors.push(where + ": needs 2-3 choices");
-  for (const ch of card.choices) {
-    if (ch.label.length >= 240) errors.push(where + ": label too long");
-    for (const [k, v] of Object.entries(ch.effects)) {
-      if (!okKeys.has(k)) errors.push(where + ": bad effect key " + k);
-      if (v < -40 || v > 40) errors.push(where + ": effect out of range " + k + "=" + v);
-    }
+// ---------- audit ----------
+const errors = [], warn = [];
+const ids = new Set(D.characters.characters.map(c => c.id));
+const okEff = new Set(["drama", "clout", "sanity", "members", "leak", "saint_heat", "kimmy", "mike_esc", "boss", "defend", "reveal_secret", "princess_meaner", "marcus_call", "fury", "watch_live"]);
+const flagsSet = new Set(), flagsReq = new Set(), seen = new Set();
+let beats = 0, choices = 0, reacts = 0;
+function checkChoices(where, list, thread) {
+  if (!list || list.length < 2 || list.length > 4) errors.push(where + ": needs 2-4 choices");
+  for (const c of list || []) {
+    choices++;
+    if (!c.label) errors.push(where + ": choice without label");
+    for (const [k, v] of Object.entries(c.effects || {})) { if (!okEff.has(k)) errors.push(where + ": bad effect " + k); if (Math.abs(v) > 40) errors.push(where + ": effect too big " + k); }
+    for (const r of c.react || []) { reacts++; if (!ids.has(r.speaker)) errors.push(where + ": bad react speaker " + r.speaker); }
+    if (c.set) flagsSet.add(c.set);
+    if (c.next && (!thread || !thread.beats || !thread.beats[c.next])) errors.push(where + ": missing beat " + c.next);
+    for (const k of ["ally", "dunk"]) if (c[k] && !ids.has(c[k])) errors.push(where + ": bad " + k + " " + c[k]);
   }
 }
-for (const d of decs) {
-  if (seenIds.has(d.id)) errors.push("duplicate id " + d.id); seenIds.add(d.id);
-  checkCard(d, d.id);
-  for (const c of new Set([d.speaker].concat(d.features || []))) if (featureCount[c] !== undefined) featureCount[c]++;
-  if (d.speaker === "princess" || (d.features || []).includes("princess")) arcs.princess++;
-  if (["mcman", "pookie"].includes(d.speaker)) arcs.mcman_pookie++;
-  if ((d.tags || []).includes("council") || d.speaker === "section8") arcs.saint++;
-  if ((d.tags || []).includes("political")) arcs.political++;
-  for (const c of d.features || []) if (!ids.has(c)) errors.push(d.id + ": unknown feature " + c);
+for (const t of D.threads) {
+  if (seen.has(t.id)) errors.push("duplicate thread " + t.id); seen.add(t.id);
+  if (!ids.has(t.speaker)) errors.push(t.id + ": bad speaker " + t.speaker);
+  if (!t.text || t.text.length > 260) errors.push(t.id + ": text missing or too long");
+  for (const l of t.lead || []) if (!ids.has(l.speaker)) errors.push(t.id + ": bad lead speaker");
+  checkChoices(t.id, t.choices, t);
+  for (const [b, beat] of Object.entries(t.beats || {})) { beats++; if (beat.speaker && !ids.has(beat.speaker)) errors.push(t.id + "/" + b + ": bad speaker"); for (const l of beat.lead || []) if (!ids.has(l.speaker)) errors.push(t.id + "/" + b + ": bad lead"); checkChoices(t.id + "/" + b, beat.choices, t); }
+  for (const f of t.requires || []) flagsReq.add(f);
 }
-for (const [k, s] of Object.entries(sigs)) checkCard(s, "sig:" + k);
-const banned = /\b(n[i1]gg|f[a@]gg|retard|tr[a@]nny|kike|spic\b|chink)/i;
-const allText = JSON.stringify(D.messages) + JSON.stringify(D.characters);
-if (banned.test(allText)) errors.push("slur-pattern match found in content");
-console.log("=== CONTENT AUDIT ===");
-console.log("decision cards:", decs.length, "| signature templates:", Object.keys(sigs).length, "| ambient:", D.messages.ambient.length);
-console.log("arc cards:", arcs);
-console.log("core characters under 3 cards:", Object.entries(featureCount).filter(([, n]) => n < 3));
+for (const [k, s] of Object.entries(D.core.signatures)) { if (!ids.has(s.speaker)) errors.push("sig " + k + ": bad speaker"); checkChoices("sig:" + k, s.choices, null); }
+for (const a of D.core.ambient) if (!ids.has(a.speaker)) errors.push("ambient bad speaker " + a.speaker);
+for (const f of flagsReq) if (!flagsSet.has(f)) errors.push("flag required but never set: " + f);
+const realNames = /\b(trump|biden|obama|harris|maga)\b/i;
+const all = JSON.stringify(D.threads) + JSON.stringify(D.core);
+if (realNames.test(all)) errors.push("real political name found");
+if (/\b(n[i1]gg|f[a@]gg|retard|tr[a@]nny|kike|chink)/i.test(all)) errors.push("slur pattern found");
+const bySpeaker = {}; for (const t of D.threads) bySpeaker[t.speaker] = (bySpeaker[t.speaker] || 0) + 1;
+console.log("=== AUDIT ===");
+console.log("threads", D.threads.length, "| follow-up beats", beats, "| choices", choices, "| reaction lines", reacts, "| signature events", Object.keys(D.core.signatures).length, "| ambient", D.core.ambient.length);
+console.log("threads by speaker", JSON.stringify(bySpeaker));
+console.log("callback flags", [...flagsReq].join(", "));
 console.log("errors:", errors.length ? errors : "none");
 
-// ---------- simulation ----------
-function score(effects) {
-  let s = 0;
-  for (const m of ["drama", "clout", "sanity", "members"]) {
-    const v = Math.max(0, Math.min(100, GS.meters[m] + (effects[m] || 0)));
-    s += Math.pow(v - 50, 2) + (v <= 8 || v >= 92 ? 5000 : 0);
+// ---------- bots ----------
+const METERS = ["drama", "clout", "sanity", "members"];
+function risk(c) {
+  const s = GS.s, k = GS.scale(), T = GS.T;
+  let r = 0;
+  const eff = Object.assign({}, c.effects);
+  if (eff.sanity === undefined) eff.sanity = c.act ? T.default_act_sanity : T.default_say_sanity;
+  for (const m of METERS) {
+    const v = s.meters[m] + (eff[m] || 0) * k;
+    r += Math.pow(v - 50, 2) + (v <= 10 || v >= 90 ? 4000 : 0);
   }
-  return s;
+  if (c.spicy) r += s.hidden.leak * 30 + (s.hidden.strikes >= 2 ? 3000 : 400);
+  if (c.sexual) r += 2000;
+  if ((eff.kimmy || 0) < 0 && s.hidden.kimmy <= -3) r += 1500;
+  if (eff.defend && s.hidden.saint_heat >= 4) r += 1500;
+  return r;
 }
-const strategies = {
-  random: d => GS.pick(d.choices),
-  smart: d => {
-    let best = null, bs = Infinity;
-    for (const c of d.choices) {
-      let s = score(c.effects);
-      if (c.spicy) s += GS.hidden.leak * 25 + (GS.hidden.admin_strikes >= 2 ? 3000 : 0);
-      if (c.effects.offense) s += 3000;
-      if ((c.effects.kimmy || 0) < 0 && GS.kimmy_love <= -3) s += 2500;
-      if (c.effects.defend && GS.hidden.council_anger >= 4) s += 2000;
-      if (s < bs) { bs = s; best = c; }
-    }
-    return best;
-  },
-  spicy: d => d.choices.find(c => c.spicy) || GS.pick(d.choices)
+const FIX = { drama_high: ["peace_gif", "go_dark"], drama_low: ["stir_pot"], sanity_low: ["meme_drop", "call_auntie", "go_dark"],
+  clout_high: ["humble_post", "go_dark"], clout_low: ["stir_pot"], members_low: ["invite_cousins"], leak: ["delete_pray"], strikes: ["summon_bigbro"], muted: ["kimmy_favor"] };
+function needs(edge) {
+  const s = GS.s, out = [];
+  if (s.meters.drama >= 100 - edge) out.push("drama_high"); if (s.meters.drama <= edge) out.push("drama_low");
+  if (s.meters.sanity <= edge) out.push("sanity_low"); if (s.meters.clout >= 100 - edge) out.push("clout_high");
+  if (s.meters.clout <= edge) out.push("clout_low"); if (s.meters.members <= edge) out.push("members_low");
+  if (s.hidden.leak >= 100 - edge * 1.2) out.push("leak"); if (s.hidden.strikes >= 2) out.push("strikes"); if (s.muted > 0) out.push("muted");
+  return out;
+}
+function usePowerups(edge) {
+  let used = 0;
+  for (const need of needs(edge)) for (const id of FIX[need]) if (GS.s.powerups.includes(id)) { GS.use_powerup(id); used++; break; }
+  return used;
+}
+const bots = {
+  random: { pu: 0, pick: d => Math.floor(Math.random() * d.choices.length) },
+  casual: { pu: 20, sloppy: 0.3, pick: d => minRisk(d) },
+  strategic: { pu: 25, sloppy: 0, pick: d => minRisk(d) },
+  no_powerups: { pu: 0, sloppy: 0.3, pick: d => minRisk(d) }
 };
+function secondBest(d) { const r = d.choices.map((c, i) => [risk(c), i]).sort((a, b) => a[0] - b[0]); return (r[1] || r[0])[1]; }
+function minRisk(d) { let b = 0, bs = Infinity; d.choices.forEach((c, i) => { const r = risk(c); if (r < bs) { bs = r; b = i; } }); return b; }
 
-function runOnce(strat) {
-  GS.reset_run();
-  const tally = { combos: 0, wars: 0, sigsSeen: new Set(), speakers: new Set() };
-  const notePost = (s, o) => { tally.speakers.add(s); for (const e of GS.note_post(s, o)) if (e.type === "post") tally.speakers.add(e.speaker); };
-  for (const e of GS.pending_events) if (e.type === "post") notePost(e.speaker);
-  while (true) {
-    for (const a of GS.pick_ambient()) { notePost(a.speaker, { stats: a.stats }); GS.apply_ambient(a); }
-    const d = GS.next_decision();
-    if (d.sig) tally.sigsSeen.add(d.sig);
-    notePost(d.speaker, { stats: (d.tags || []).includes("stats") });
-    for (const e of GS.on_decision_posted(d)) if (e.type === "post") notePost(e.speaker);
-    let evs;
-    if (GS.is_muted()) evs = GS.auto_resolve(d);
-    else {
-      if (strat === "smart") for (const b of GS.get_bonus_actions()) GS.bonus_action(b.id);
-      evs = GS.apply_choice(d, strategies[strat](d));
+function run(botName) {
+  const bot = bots[botName];
+  GS.profile = { best_free: 0, best_daily: 0, daily: { date: "", best: 0 }, unlocked: ALL ? Object.keys(D.core.powerups) : D.tuning.powerup_starters.slice(), achievements: [], runs: 1, tutorial_done: true };
+  GS.new_run("free", "Bot", (Math.random() * 4294967296) >>> 0);
+  const s = GS.s;
+  for (let guard = 0; guard < 400; guard++) {
+    GS.start_moment();
+    let r = GS.check_end(); if (r) return { r, s };
+    if (bot.pu) usePowerups(bot.pu);
+    if (GS.s.current) {
+      if (s.muted > 0) GS.muted_resolve();
+      else {
+        const sloppy = bot.sloppy && Math.random() < bot.sloppy;
+        GS.choose(sloppy ? secondBest(GS.s.current) : bot.pick(GS.s.current));
+      }
     }
-    for (const e of evs) if (e.type === "post") notePost(e.speaker);
-    let r = GS.check_lose_conditions();
-    if (r) { GS.end_run(r); return { r, day: GS.day, tally }; }
-    const res = GS.advance_decision();
-    for (const e of res.events) if (e.type === "post") notePost(e.speaker);
-    r = GS.check_lose_conditions();
-    if (r) { GS.end_run(r); return { r, day: GS.day, tally }; }
+    r = GS.check_end(); if (r) return { r, s };
+    const res = GS.end_moment();
+    r = GS.check_end(); if (r) return { r, s };
     if (res.day_complete) {
-      if (GS.day >= GS.tuning.total_days) { GS.end_run("win"); return { r: "win", day: GS.day, tally }; }
-      for (const e of GS.roll_day()) if (e.type === "post") notePost(e.speaker);
-      r = GS.check_lose_conditions();
-      if (r) { GS.end_run(r); return { r, day: GS.day, tally }; }
+      if (s.day >= D.tuning.total_days) return { r: "win", s };
+      if (bot.pu) { const offer = GS.day_offer(); const want = needs(35).flatMap(n => FIX[n]); GS.take_powerup(offer.find(o => want.includes(o)) || offer[0]); }
+      GS.roll_day();
+      r = GS.check_end(); if (r) return { r, s };
     }
   }
+  return { r: "stuck", s };
 }
-
-const N = parseInt(process.argv[2] || "2000", 10);
-console.log("\n=== SIMULATION (" + N + " runs each) ===");
-for (const strat of Object.keys(strategies)) {
-  const ends = {}, days = []; let reruns = 0, wins = 0; const sigAll = new Set(), spk = new Set();
-  let combos = 0, wars = 0, dogpiles = 0, lurker = 0, mutes = 0, statsWars = 0, beefs = 0, furies = 0;
+console.log("\n=== SIMULATION (" + N + " runs each" + (ALL ? ", all power-ups unlocked" : ", starter power-ups") + ") ===");
+for (const b of Object.keys(bots)) {
+  const ends = {}, days = []; let wins = 0, reruns = 0; const c = { mutes: 0, wars: 0, combos: 0, stats_wars: 0, grudges_hit: 0, delayed_hits: 0, pu_used: 0, beefs: 0, favors: 0 };
   for (let i = 0; i < N; i++) {
-    const o = runOnce(strat);
-    ends[o.r] = (ends[o.r] || 0) + 1; days.push(o.day); if (o.r === "win") wins++;
-    reruns += GS.stats.reruns; o.tally.sigsSeen.forEach(s => sigAll.add(s)); o.tally.speakers.forEach(s => spk.add(s));
-    combos += GS.flags.combos; wars += GS.flags.wars; dogpiles += GS.flags.dogpiles;
-    if (GS.flags.lurker_spoke) lurker++; mutes += GS.flags.mutes; statsWars += GS.flags.stats_wars; beefs += GS.flags.beefs; furies += GS.flags.furies;
+    const o = run(b); ends[o.r] = (ends[o.r] || 0) + 1; days.push(o.r === "win" ? 31 : o.s.day); if (o.r === "win") wins++;
+    reruns += o.s.counters.reruns || 0; for (const k in c) c[k] += o.s.counters[k] || 0;
   }
   days.sort((a, b) => a - b);
-  console.log("\n[" + strat + "] win " + (100 * wins / N).toFixed(1) + "% | median death day " + days[Math.floor(N / 2)] +
-    " | repeated cards " + reruns + " | avg combos " + (combos / N).toFixed(2) + " wars " + (wars / N).toFixed(2) +
-    " dogpiles " + (dogpiles / N).toFixed(2) + " mutes " + (mutes / N).toFixed(2) + " statsWars " + (statsWars / N).toFixed(2) +
-    " beefs " + (beefs / N).toFixed(2) + " furies " + (furies / N).toFixed(2) + " | lurker spoke " + (100 * lurker / N).toFixed(0) + "%");
-  console.log("  end states:", ends);
-  console.log("  signatures seen:", [...sigAll].sort().join(", "));
-  console.log("  characters never seen:", [...ids].filter(i => !spk.has(i)));
+  const avg = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, +(v / N).toFixed(2)]));
+  console.log("\n[" + b + "] WIN " + (100 * wins / N).toFixed(1) + "% | median end day " + days[Math.floor(N / 2)] + " | reruns " + reruns);
+  console.log("  ends:", JSON.stringify(ends));
+  console.log("  per run:", JSON.stringify(avg));
 }

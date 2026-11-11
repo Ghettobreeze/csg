@@ -1,128 +1,147 @@
-// Deterministic checks for v2 signature moves, systems and every end state.
-// Run from the CSG folder:  node tools/acceptance.js
-const path = require("path");
+// Deterministic rule checks.  node tools/acceptance.js
+const path = require("path"), fs = require("fs");
 const base = path.join(__dirname, "..");
-for (const f of ["data/tuning.js", "data/characters.js", "data/messages.js", "data/end_states.js"]) require(path.join(base, f));
+for (const f of ["data/tuning.js", "data/characters.js", "data/content_core.js", "data/threads_gender.js", "data/threads_politics.js", "data/threads_crew.js", "data/threads_more.js", "data/end_states.js"]) require(path.join(base, f));
 const G = require(path.join(base, "js/game_state.js"));
 G.load_data();
+const C = globalThis.CSG_DATA.core, T = globalThis.CSG_DATA.tuning;
 let pass = 0, fail = 0;
-function check(name, cond) { if (cond) pass++; else fail++; console.log((cond ? "PASS " : "FAIL ") + name); }
+const check = (name, ok) => { ok ? pass++ : fail++; console.log((ok ? "PASS " : "FAIL ") + name); };
+const fresh = (seed) => { G.profile = { best_free: 0, best_daily: 0, daily: { date: "", best: 0 }, unlocked: Object.keys(C.powerups), achievements: [], runs: 1, tutorial_done: true }; G.new_run("free", "Tester", seed || 12345); G.s.powerups = []; return G.s; };
 const sig = k => G.make_sig(k);
-const pickChoice = (d, label) => d.choices.find(c => c.label.startsWith(label));
-const choose = (d, label) => G.apply_choice(d, pickChoice(d, label));
-const hasBadge = (ev, b) => ev.some(e => e.badge && e.badge.includes(b));
-const card = id => G.decisions.find(d => d.id === id);
-const spicy = { label: "x", spicy: true, effects: {} };
+const pickLabel = (d, start) => d.choices.findIndex(c => c.label.startsWith(start));
+const badge = (ev, b) => ev.some(e => e.badge && e.badge.includes(b));
 
-check("Roster has 25 characters", G.roster.length === 25);
-check("Crypto Craig and Prof are cut", !G.characters.cryptocraig && !G.characters.prof);
-check("Every choice is 2-3 options with a real label", G.decisions.every(d => d.choices.length >= 2 && d.choices.length <= 3 && d.choices.every(c => c.label && c.label.length < 240)));
+// Daily runs are identical for everyone on the same day
+G.profile = { best_free: 0, best_daily: 0, daily: {}, unlocked: T.powerup_starters.slice(), achievements: [], runs: 1, tutorial_done: true };
+G.new_run("daily", "A"); const a = G.start_moment().decision.text, aSeed = G.s.brittany_target + G.s.shirt_day;
+G.new_run("daily", "B"); const b = G.start_moment().decision.text, bSeed = G.s.brittany_target + G.s.shirt_day;
+check("Daily Run: same first card and same hidden schedule for two players", a === b && aSeed === bSeed);
 
-// Kimmy: warning, mute, auto-resolve, unmute, love side vouch, hate side report
-G.reset_run(); G.kimmy_love = 5; let ev = choose(card("cat_marcus"), "Marcus, it's for the culture");
-check("Kimmy warns first when she likes you", hasBadge(ev, "FAMILY GROUP") && !G.is_muted());
-ev = choose(card("cat_mike"), "she's got a point");
-check("Second offense: Kimmy mutes you for a day", hasBadge(ev, "MUTED") && G.muted_turns === G.tuning.mute_turns);
-ev = G.auto_resolve(card("kimmy_fenced"));
-check("While muted, the group answers for you", ev[0].text.includes("muted"));
-let unmuted = false; for (let i = 0; i < G.tuning.mute_turns; i++) unmuted = hasBadge(G.advance_decision().events, "UNMUTED") || unmuted;
-check("Kimmy unmutes you after a day", !G.is_muted() && unmuted);
-G.reset_run(); G.kimmy_love = 8; G.rng = () => 0;
-ev = G.apply_choice({ id: "r1", tags: [] }, spicy);
-check("Love side: Kimmy talks Big Bro out of a strike", hasBadge(ev, "KIMMY VOUCHED") && G.hidden.admin_strikes === 0);
-G.reset_run(); G.kimmy_love = -9; G.rng = () => 0.99;
-ev = choose(card("cat_marcus"), "Marcus, it's for the culture");
-check("Hate side: mute comes with a report to Big Bro", hasBadge(ev, "MUTED") && hasBadge(ev, "STRIKE"));
-G.rng = Math.random;
+// Danger ramps with the day
+fresh(); const k1 = G.scale(); G.s.day = 30; const k30 = G.scale();
+check("Effects ramp from x" + k1 + " on day 1 to x" + k30 + " on day 30", k1 === T.effect_scale_day1 && Math.abs(k30 - T.effect_scale_day30) < 1e-9);
 
-// Pander Princess: co-signs, men reply, meaner after exposure, beef with Mike
-G.reset_run(); const take = sig("princess_take"); ev = G.on_decision_posted(take);
-check("Princess post: Pookie + McMan co-sign and a man replies", ev.filter(e => e.type === "post").length === 3 && ev.some(e => e.speaker === "pookie") && ev.some(e => e.speaker === "mcman"));
-check("Co-signs don't arm the combo", ev.every(e => e.quiet || !["pookie", "mcman"].includes(e.speaker)));
-choose(sig("princess_take"), "post his spot"); let before = G.meters.drama; choose(sig("princess_take"), "PREACH");
-check("Exposed Princess comes back meaner", G.meters.drama - before > Math.round(20 * G.tuning.choice_effect_scale));
-G.reset_run(); choose(card("princess_mike"), "tag Big Mike");
-check("Tagging Mike starts a video beef", G.sig_queue[0] && G.sig_queue[0].sig === "bigmike_beef");
+// Every reply touches Sanity: arguing drains, checking out restores
+fresh(); G.s.current = { kind: "thread", thread: "zz", speaker: "coach", tags: [], choices: [{ label: "say", effects: {} }, { label: "do", act: true, effects: {} }] };
+let s0 = G.s.meters.sanity; G.apply_choice(G.s.current, G.s.current.choices[0]); const say = G.s.meters.sanity - s0;
+s0 = G.s.meters.sanity; G.apply_choice(G.s.current, G.s.current.choices[1]); const act = G.s.meters.sanity - s0;
+check("Replies with no Sanity effect default to drain (" + say + ") and actions restore (+" + act + ")", say < 0 && act > 0);
 
-// McMan Hater + Pookie Patrol combo, peace gif
-G.reset_run(); G.turn = 5; G.note_post("pookie"); G.turn = 6; ev = G.note_post("mcman");
-check("McMan + Pookie back to back arms the combo", G.combo_window === 2 && hasBadge(ev, "COMBO"));
-const d0 = G.meters.drama; G.advance_decision(); ev = G.advance_decision().events;
-check("Undefused combo hits Drama +40", hasBadge(ev, "COMBO HIT") && G.meters.drama >= d0 + 40 - 2 * G.tuning.drama_cooldown_per_turn - 2);
-G.reset_run(); G.turn = 5; G.note_post("pookie"); G.note_post("mcman");
-check("Peace gif offered and defuses", G.get_bonus_actions().some(a => a.id === "peace_gif") && (G.bonus_action("peace_gif"), G.combo_window === 0));
+// High drama drains sanity on its own
+fresh(); G.s.meters.drama = 90; s0 = G.s.meters.sanity; G.end_moment();
+check("High Drama drains Sanity every turn", G.s.meters.sanity < s0);
 
-// Stats war
-G.reset_run(); G.turn = 3; G.note_post("mcman", { stats: true }); G.turn = 5; ev = G.note_post("section8", { stats: true });
-check("McMan + Saint junk stats close together start a stats war", G.sig_queue[0] && G.sig_queue[0].sig === "stats_war");
+// Members: healthy drama grows the group, extremes shrink it
+fresh(); G.s.meters.drama = 50; let m0 = G.s.meters.members; G.end_moment(); const healthy = G.s.meters.members - m0;
+fresh(); G.s.meters.drama = 95; m0 = G.s.meters.members; G.end_moment(); const sick = G.s.meters.members - m0;
+check("Members grow at healthy Drama (+" + healthy + ") and shrink at extremes (" + sick + ")", healthy > 0 && sick < 0);
 
-// Saint: Council anger, one-man dogpile, Auntie Pat calms
-G.reset_run(); for (let i = 0; i < 5; i++) G.apply_choice(Object.assign({}, card("saint_highvalue"), { id: "c" + i }), card("saint_highvalue").choices[1]);
-check("Saint cards raise Council anger", G.hidden.council_anger >= 5);
-ev = choose(sig("tiffany_dogpile"), "defend her");
-check("Defending someone triggers the one-man Council dogpile", hasBadge(ev, "COUNCIL DOGPILE") && ev.filter(e => e.speaker === "section8").length >= 4);
-G.reset_run(); G.hidden.council_anger = 4;
-check("Auntie Pat offered and calms the Saint", G.get_bonus_actions().some(a => a.id === "auntie") && (G.bonus_action("auntie"), G.hidden.council_anger === 0));
+// Power-ups
+fresh(); G.s.powerups = ["peace_gif"]; G.s.meters.drama = 80; G.s.combo = 2; G.s.war = 2;
+G.use_powerup("peace_gif");
+check("Peace Gif: Drama down, combo and war stopped", G.s.meters.drama < 80 && G.s.combo === 0 && G.s.war === 0);
+fresh(); G.s.powerups = ["delete_pray"]; G.s.hidden.leak = 80; G.use_powerup("delete_pray");
+check("Delete & Pray: Leak -30", G.s.hidden.leak === 50);
+fresh(); G.s.powerups = ["kimmy_favor"]; G.s.muted = 3; G.use_powerup("kimmy_favor");
+check("Kimmy's Favor unmutes you", G.s.muted === 0);
+fresh(); G.s.powerups = ["summon_bigbro"]; G.s.hidden.strikes = 2; G.use_powerup("summon_bigbro");
+check("Summon Big Bro erases a strike", G.s.hidden.strikes === 1);
+fresh(); G.start_moment(); G.s.powerups = ["go_dark"]; const r = G.use_powerup("go_dark");
+check("Go Dark skips the current card", r.consumed && G.s.current === null);
+fresh(); G.s.powerups = ["peace_gif", "meme_drop", "stir_pot"]; G.take_powerup("call_auntie");
+check("Max 3 power-ups: picking a 4th replaces the oldest", G.s.powerups.length === 3 && G.s.powerups[0] === "meme_drop" && G.s.powerups[2] === "call_auntie");
+fresh(); G.s.day = 30; const d30 = G.s.meters.drama = 80; G.s.powerups = ["peace_gif"]; G.use_powerup("peace_gif");
+check("Power-ups scale with the day (Peace Gif on day 30: -" + (d30 - G.s.meters.drama) + ")", d30 - G.s.meters.drama > 25);
+G.profile.unlocked = T.powerup_starters.slice(); G.profile.best_free = 0; G.profile.best_daily = 0;
+fresh(); G.profile.unlocked = T.powerup_starters.slice(); G.s.day = 16; const sum = G.finish_run("drama_high");
+check("Reaching day 16 unlocks Stir the Pot, Humble Post and Call Auntie Pat", ["stir_pot", "humble_post", "call_auntie"].every(id => sum.unlocked.includes(id)));
 
-// Coach vs the three
-G.reset_run(); ev = choose(card("debra_strategy"), "leave it on read");
-check("Political card starts a 3-turn war", G.war_turns === 3 && hasBadge(ev, "FACTION WAR"));
-check("War queues Coach's 'makes a point' card", G.sig_queue[0] && G.sig_queue[0].sig === "coach_logic");
-const cl = sig("coach_logic");
-check("Backing Coach: Kimmy up, Clout down", (() => { const k = G.kimmy_love, c = G.meters.clout; choose(cl, "Coach is right"); return G.kimmy_love > k && G.meters.clout < c; })());
-G.advance_decision(); G.advance_decision(); ev = G.advance_decision().events;
-check("War ends after 3 turns", G.war_turns === 0 && ev.some(e => e.text && e.text.includes("burned out")));
-check("No real politician names in content", !/trump|biden|obama|harris|desantis/i.test(JSON.stringify(G.content)));
+// Timer: auto picks the worst reply
+fresh(); G.s.current = { kind: "thread", thread: "zz", speaker: "coach", tags: [], choices: [{ label: "calm", effects: { drama: -2 } }, { label: "chaos", spicy: true, effects: { drama: 30, clout: 20 } }] };
+check("Timer runs out: the group picks the worst reply for you", G.auto_index() === 1);
 
-// Furious 4
-G.reset_run(); ev = choose(card("f4_requirements"), "what do YOU bring");
-check("Asking what she brings: ALL CAPS mode for 3 turns", hasBadge(ev, "ALL CAPS") && G.fury_turns === 3);
-ev = G.advance_decision().events;
-check("Caps mode posts with backup", hasBadge(ev, "ALL CAPS") && ev.filter(e => e.type === "post").length >= 2);
+// Kimmy mute + vouch
+fresh(); G.s.hidden.kimmy = -6; let ev = G.kimmy_check();
+check("Kimmy mutes you for a day when she's had enough", G.s.muted === T.mute_moments && badge(ev, "MUTED"));
+fresh(); G.s.hidden.kimmy = 7; G.s.hidden.strikes = 1; ev = G.kimmy_check();
+check("Kimmy vouches for you and erases a strike when she likes you", G.s.hidden.strikes === 0 && badge(ev, "VOUCHED"));
+fresh(); G.s.current = { kind: "thread", thread: "zz", speaker: "coach", tags: [], choices: [{ label: "x", effects: { drama: 10 } }] }; G.s.muted = 2; G.muted_resolve();
+check("Muted: the chat moves on without you", G.s.current === null);
 
-// Big Mike
-G.reset_run(); ev = G.on_decision_posted(sig("bigmike_video"));
-check("Mike videos get shirt begs", ev.some(e => e.type === "post" && G.content.shirt_begs.some(b => b[1] === e.text)));
-G.reset_run(); G.hidden.bigmike_escalation = 2; G.day = 19; G.roll_day();
-check("Ignored Mike goes live by day 20", G.flags.livestream && G.sig_queue[0].sig === "bigmike_live");
-G.reset_run(); G.day = G.flags.shirt_day - 1; ev = G.roll_day();
-check("Once per run, Mike wears a shirt", hasBadge(ev, "SHIRT ON"));
+// Sexual reply -> Kimmy deletes
+fresh(); ev = G.apply_choice({ kind: "thread", thread: "zz", speaker: "catfish", tags: [] }, { label: "x", spicy: true, sexual: true, effects: {} });
+check("Sexual reply: Kimmy deletes it", badge(ev, "DELETED"));
 
-// Big Bro, Shady, Lurker, Marcus, Brittany, Boss Babe, Dave
-G.reset_run(); G.day = G.flags.bigbro_days[0] - 1; ev = G.roll_day();
-check("Big Bro rare drop (rap or joke)", hasBadge(ev, "BIG BRO"));
-G.reset_run(); G.rng = () => 0; G.kimmy_love = 0; ev = [];
-for (let i = 0; i < 3; i++) ev = ev.concat(G.apply_choice({ id: "s" + i, tags: [] }, spicy));
-check("Strikes announced as raps; 3 = deleted", hasBadge(ev, "STRIKE 2/3") && G.check_lose_conditions() === "admin");
-G.rng = Math.random;
-G.reset_run(); G.rng = () => 0.99; G.flags.last_spicy_reply = "Coach got EXPELLED"; G.hidden.leak = 89;
-ev = G.apply_choice({ id: "x", tags: [] }, { label: "screenshot it", act: true, spicy: true, effects: {} });
-check("Shady's other group quotes your reply at high leak", ev.some(e => e.type === "system" && e.text.includes("Coach got EXPELLED")));
-G.reset_run(); for (let i = 0; i < 9; i++) G.apply_choice({ id: "l" + i, tags: [] }, spicy);
-check("Leak 100 ends the run", G.check_lose_conditions() === "leak");
-G.rng = Math.random;
-G.reset_run(); for (let i = 0; i < 40; i++) G.note_post("kimmy");
-check("Lurker speaks once after 40 messages", hasBadge(G.advance_decision().events, "LURKER") && !hasBadge(G.advance_decision().events, "LURKER"));
-G.reset_run(); choose(sig("marcus_leaving"), "bye Marcus");
-check("Calling Marcus's bluff: he leaves with 3", G.flags.marcus_left && G.member_count() === 21);
-G.reset_run(); G.day = G.flags.brittany_day - 1; G.roll_day();
-check("Brittany detonates her target", G.sig_queue.some(s => s.sig === "brittany_bomb" && s.text.includes(G.target_name())));
-G.reset_run(); G.hidden.bossbabe_recruit_progress = 9; G.day = 11; ev = G.roll_day();
-check("Unchecked Boss Babe recruits Tiffany on day 12", hasBadge(ev, "TIFFANY RECRUITED"));
-G.reset_run(); G.time_of_day = "night"; G.note_post("drunktdave"); ev = G.roll_day();
-check("Drunk Dave's 9am apology", hasBadge(ev, "9AM APOLOGY"));
+// Threads: follow-up beats and reactions
+fresh(); const t = G.threads.find(x => x.id === "g_myman"); const inst = G.instance(t);
+ev = G.apply_choice(inst, inst.choices[0]);
+check("Thread follow-up beat is queued next after your reply", G.s.queue[0] && G.s.queue[0].key === "t:g_myman:b");
+check("Characters react to what you said", ev.some(e => e.type === "post" && e.speaker === "pookie"));
 
-// End states and day structure
-const reasons = new Set(["win"]);
-for (const [m, v, r] of [["drama", 100, "drama_high"], ["drama", 0, "drama_low"], ["clout", 100, "clout_high"], ["clout", 0, "clout_low"],
-  ["sanity", 0, "sanity_low"], ["sanity", 100, "sanity_high"], ["members", 0, "members_low"], ["members", 100, "members_high"]]) {
-  G.reset_run(); G.meters[m] = v; if (G.check_lose_conditions() === r) reasons.add(r);
-}
-G.reset_run(); G.hidden.leak = 100; if (G.check_lose_conditions() === "leak") reasons.add("leak");
-G.reset_run(); G.hidden.admin_strikes = 3; if (G.check_lose_conditions() === "admin") reasons.add("admin");
-check("All 11 end states reachable with text", reasons.size === 11 && [...reasons].every(r => G.end_states[r]));
-G.reset_run(); let n = 1; while (!G.advance_decision().day_complete) n++;
-check("Exactly " + G.tuning.decisions_per_day + " decisions per day", n === G.tuning.decisions_per_day);
+// Callbacks: a flag set earlier unlocks a later thread
+fresh(); const cb = G.threads.find(x => x.id === "p_payback"); G.s.day = 14;
+const before = G.thread_ok(cb); G.s.flags.backed_coach = true; const after = G.thread_ok(cb);
+check("Callback thread only appears after you backed Coach", !before && after);
+
+// Grudges and favors
+fresh(); G.s.grudges.princess = -3; { const R = G.rand; G.rand = () => 0; ev = G.grudge_events(); G.rand = R; }
+check("A character you dunked on comes back with a grudge", badge(ev, "GRUDGE"));
+fresh(); G.s.grudges.coach = 3; G.s.meters.drama = 90; { const R = G.rand; G.rand = () => 0; ev = G.grudge_events(); G.rand = R; }
+check("A character you backed has your back (worst meter eased)", badge(ev, "YOUR BACK") && G.s.meters.drama < 90);
+
+// Delayed consequences
+fresh(); G.s.delayed.push({ day: 3, kind: "shady", quote: "old spicy line" }); G.s.day = 2; const leak0 = G.s.hidden.leak; ev = G.roll_day();
+check("A spicy reply comes back days later, quoting you", ev.some(e => e.type === "system" && e.text.includes("old spicy line")) && G.s.hidden.leak > leak0);
+
+// Political war + Coach makes a point
+fresh(); const pol = G.instance(G.threads.find(x => x.id === "p_name"));
+ev = G.apply_choice(pol, pol.choices[0]);
+check("Political thread starts a 3-turn war and queues 'Coach makes a point'", G.s.war === 3 && G.s.queue.some(q => q.sig === "coach_logic"));
+
+// Combo, stats war, saint dogpile, fury
+fresh(); G.s.turn = 5; ev = []; G.note_post(ev, "mcman"); G.note_post(ev, "pookie");
+check("McMan Hater + Pookie Patrol back to back arm a combo", G.s.combo === T.combo_window);
+fresh(); G.s.turn = 5; ev = []; G.note_post(ev, "mcman", { stats: true }); G.s.turn = 6; G.note_post(ev, "section8", { stats: true });
+check("Saint + McMan both posting stats starts a stats war", G.s.queue.some(q => q.sig === "stats_war"));
+fresh(); G.s.hidden.saint_heat = 6; ev = G.apply_choice({ kind: "thread", thread: "zz", speaker: "tiffany", tags: [] }, { label: "x", effects: { defend: 1 } });
+check("Defending someone while the Saint is heated sets him off", badge(ev, "HEATED"));
+fresh(); ev = G.apply_choice({ kind: "thread", thread: "zz", speaker: "furious4", tags: [] }, { label: "x", effects: { fury: 1 } });
+check("Asking the Furious 4 what she brings puts her in ALL CAPS", G.s.fury === T.fury_turns && badge(ev, "ALL CAPS"));
+
+// Signature schedule
+fresh(); G.s.day = G.s.stat_days[0] - 1; G.roll_day();
+check("Hater stat fight is scheduled (with real-number replies)", G.s.queue.some(q => q.sig === "hater_stat") && C.signatures.hater_stat.choices.some(c => c.label.includes("2.5 million")));
+fresh(); G.s.day = G.s.violence_day - 1; G.roll_day();
+check("'Not in here' shutdown fires once; no stat is ever posted", G.s.queue.some(q => q.sig === "violence_shutdown") && !/[0-9]/.test(C.signatures.violence_shutdown.variants.join("")));
+fresh(); G.s.day = G.s.shirt_day - 1; ev = G.roll_day();
+check("Big Mike wears a shirt once (and opens with 'My $0.04,')", G.s.flags.saw_shirt && ev.some(e => e.text && e.text.startsWith("My $0.04,")));
+check("Big Mike opens every post with 'My $0.02,' (or $0.04 on shirt day)", (() => {
+  const all = []; for (const th of G.threads) { if (th.speaker === "bigmike") all.push(th.text); for (const c of th.choices) for (const r of c.react || []) if (r.speaker === "bigmike") all.push(r.text); for (const bt of Object.values(th.beats || {})) { for (const l of bt.lead || []) if (l.speaker === "bigmike") all.push(l.text); for (const c of bt.choices) for (const r of c.react || []) if (r.speaker === "bigmike") all.push(r.text); } }
+  for (const sg of Object.values(C.signatures)) { if (sg.speaker === "bigmike") all.push(...sg.variants); for (const c of sg.choices) for (const r of c.react || []) if (r.speaker === "bigmike") all.push(r.text); }
+  for (const a of C.ambient.concat(C.princess_reactions.men, C.grudge_lines.bigmike, C.favor_lines.bigmike.map(t => ({ speaker: "bigmike", text: t })))) { const tx = a.text || a; if (!a.speaker || a.speaker === "bigmike") all.push(tx); }
+  const bad = all.filter(x => !/^My \$0\.0[24],/.test(x)); if (bad.length) console.log("   not $0.02:", bad.slice(0, 3)); return bad.length === 0; })());
+check("No 'Council' anywhere in the content", !/council/i.test(JSON.stringify(globalThis.CSG_DATA.threads) + JSON.stringify(C)));
+
+// Endings, cause of death, share text, achievements
+fresh(); const reasons = new Set();
+for (const [m, v, rr] of [["drama", 100, "drama_high"], ["drama", 0, "drama_low"], ["clout", 100, "clout_high"], ["clout", 0, "clout_low"], ["sanity", 0, "sanity_low"], ["sanity", 100, "sanity_high"], ["members", 0, "members_low"], ["members", 100, "members_high"]]) { fresh(); G.s.meters[m] = v; if (G.check_end() === rr) reasons.add(rr); }
+fresh(); G.s.hidden.leak = 100; if (G.check_end() === "leak") reasons.add("leak");
+fresh(); G.s.hidden.strikes = 3; if (G.check_end() === "admin") reasons.add("admin");
+reasons.add("win");
+check("All 11 endings reachable and have text", reasons.size === 11 && [...reasons].every(r => globalThis.CSG_DATA.end_states[r]));
+fresh(); G.meter("drama", 60, "pookie"); const cause = G.cause_of("drama_high");
+check("Cause of death names the character who pushed you over", cause === "pookie");
+fresh(); G.s.counters.mutes = 2; G.s.counters.spicy = 7; const sh = G.share_text("drama_high", 14, "pookie");
+check("Share text: day, killer, mutes, link", sh.includes("Day 14") && sh.includes("Pookie Patrol") && sh.includes("Muted 2x") && sh.includes("http"));
+fresh(); G.profile.achievements = []; G.s.counters.mutes = 3; const got = G.check_achievements("drama_high", 12);
+check("Achievements unlock (first run, day 10, muted 3x)", ["first_run", "day10", "muted3"].every(x => got.includes(x)));
+
+// Day structure + save/resume
+fresh(); let n = 0; while (!G.end_moment().day_complete) n++;
+check("Exactly " + T.moments_per_day + " reply moments per day", n + 1 === T.moments_per_day);
+fresh(); G.start_moment(); const saved = JSON.stringify(G.s); G.s = null; G.load_save();
+check("Save + resume restores the run mid-day", G.s && JSON.stringify(G.s) === saved);
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

@@ -5,84 +5,125 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#18191a">
 <title>CSG — Conversations, Shits &amp; Giggles</title>
+<meta name="description" content="Survive 30 days in the most chaotic group chat online. Most people don't make it past day 10.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="CSG — Conversations, Shits & Giggles">
+<meta property="og:description" content="Survive 30 days in the most chaotic group chat online. Most people don't make it past day 10.">
+<meta property="og:image" content="https://ghettobreeze.github.io/csg/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://ghettobreeze.github.io/csg/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://ghettobreeze.github.io/csg/og-image.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
 
-  <!-- MAIN MENU -->
   <section id="screen-menu" class="screen active">
     <div class="menu-inner">
-      <div class="menu-logo">CSG</div>
+      <div class="menu-logo" id="menu-logo"></div>
       <h1 class="menu-title">CSG</h1>
       <p class="menu-sub">Conversations, Shits &amp; Giggles</p>
-      <p class="menu-best" id="menu-best">Best: Day 0</p>
-      <button class="btn btn-primary" id="btn-start">Start</button>
-      <button class="btn btn-ghost" id="btn-howto">How to play</button>
+      <p class="menu-best" id="menu-best"></p>
+      <div class="name-row"><label for="name-input">Your name</label><input id="name-input" maxlength="18" placeholder="You" autocomplete="off"></div>
+      <button class="btn btn-gold" id="btn-continue-run" hidden>Continue</button>
+      <button class="btn btn-primary" id="btn-daily">📅 Daily Run<small id="daily-sub">Same chat for everyone today</small></button>
+      <button class="btn btn-ghost" id="btn-free">Free Play</button>
+      <div class="menu-row">
+        <button class="btn btn-ghost" id="btn-ach">🏆 <span id="ach-count">0</span></button>
+        <button class="btn btn-ghost" id="btn-howto">How to play</button>
+        <button class="btn btn-ghost" id="btn-sound-menu">🔊</button>
+      </div>
       <div class="howto" id="howto" hidden>
         <p>You're in a chaotic group chat. Keep it alive for <b>30 days</b>.</p>
-        <p>Every reply moves four meters: <b>🔥 Drama</b>, <b>😎 Clout</b>, <b>🧠 Sanity</b>, <b>👥 Members</b>. If any meter hits <b>0 or 100</b>, the run is over. Too much of anything kills the group too.</p>
-        <p><b>🌶️ Spicy</b> replies are tempting. Shady screenshots them, and Big Bro gets reports. Three strikes and the group is gone.</p>
-        <p>Kimmy runs this group. Keep it PG or she mutes you for a day, and the chat goes on without you. Her face in the corner shows how she feels about you.</p>
+        <p>Every reply moves four meters: <b>🔥 Drama</b>, <b>😎 Clout</b>, <b>🧠 Sanity</b>, <b>👥 Crew</b> (members). Hit <b>0 or 100</b> on any of them and the run is over. Too much of anything kills the group.</p>
+        <p>Arguing drains your Sanity. Leaving things on read restores it. Too checked out, and you lose that way too.</p>
+        <p>You have <b>8 seconds</b> to reply. Too slow, and your thumbs answer for you, badly.</p>
+        <p><b>Power-ups</b> sit above your replies. You can't win without them. You earn one a day, and spicy replies can earn more.</p>
+        <p><b>🌶️ Spicy</b> replies feed Shady's screenshots and get reported to Big Bro. Three strikes and the group is gone. Kimmy can mute you.</p>
         <p class="howto-small">Satire of how people act online. Every character is made up.</p>
       </div>
     </div>
   </section>
 
-  <!-- CHAT FEED -->
   <section id="screen-feed" class="screen">
     <header class="feed-header">
-      <div class="group-avatar">CSG</div>
+      <div class="group-avatar" id="group-avatar"></div>
       <div class="group-info">
-        <div class="group-name">CSG • <span id="member-count">23</span> members</div>
+        <div class="group-name">CSG • <span id="member-count">25</span> members</div>
         <div class="group-day" id="day-label">Day 1 • ☀️ Morning</div>
       </div>
-      <div class="kimmy-mood" id="kimmy-mood" title="How Kimmy feels about you">
-        <div class="kimmy-face" id="kimmy-face">😐</div>
-        <div class="kimmy-label">Kimmy</div>
-      </div>
+      <div class="kimmy-face" id="kimmy-face" title="How Kimmy feels about you">😐<small>Kimmy</small></div>
+      <button class="hdr-btn" id="btn-sound" aria-label="Sound">🔊</button>
     </header>
     <div class="hud" id="hud"></div>
     <div class="banner banner-war" id="war-banner" hidden></div>
     <div class="banner banner-combo" id="combo-banner" hidden></div>
-    <div class="banner banner-strike" id="strike-banner" hidden>🛡️ BIG BRO IS WATCHING • 2/3 STRIKES</div>
+    <div class="banner banner-fury" id="fury-banner" hidden></div>
+    <div class="banner banner-strike" id="strike-banner" hidden>🎤 BIG BRO IS WATCHING • 2/3 STRIKES</div>
+    <div class="banner banner-mute" id="mute-banner" hidden></div>
     <div class="feed-scroll" id="feed-scroll"><div class="feed" id="feed"></div></div>
+    <div class="tray" id="tray"></div>
     <div class="reply-bar" id="reply-bar"></div>
     <div class="vignette" id="vignette"></div>
     <div class="fx-layer" id="fx-layer"></div>
 
-    <!-- DAY SUMMARY -->
     <div class="overlay" id="summary" hidden>
-      <div class="summary-card">
-        <div class="summary-day" id="summary-day">Day 1 complete</div>
-        <div class="summary-rows" id="summary-rows"></div>
-        <p class="summary-flavor" id="summary-flavor"></p>
-        <button class="btn btn-primary" id="btn-continue">Continue</button>
+      <div class="card">
+        <h2 id="summary-day">Day 1 complete</h2>
+        <div class="srows" id="summary-rows"></div>
+        <p class="flavor" id="summary-flavor"></p>
+        <div id="offer-wrap">
+          <div class="offer-title">⚡ Pick a power-up</div>
+          <div class="offers" id="offers"></div>
+        </div>
+        <button class="btn btn-primary" id="btn-next-day">Continue</button>
       </div>
     </div>
   </section>
 
-  <!-- RESULTS -->
   <section id="screen-results" class="screen">
     <div class="results-inner">
       <div class="results-card" id="results-card">
         <div class="notice-head" id="results-head">Group notice</div>
         <div class="results-icon" id="results-icon">🏆</div>
-        <h2 class="results-title" id="results-title">SURVIVED 30 DAYS</h2>
+        <h2 class="results-title" id="results-title"></h2>
         <p class="results-text" id="results-text"></p>
         <p class="results-day" id="results-day"></p>
-        <p class="results-best" id="results-best"></p>
+        <div class="cause" id="results-cause" hidden></div>
+        <div class="results-extra" id="results-extra"></div>
       </div>
-      <button class="btn btn-primary" id="btn-retry">Try Again</button>
+      <button class="btn btn-primary" id="btn-share">📤 Share result</button>
+      <button class="btn btn-ghost" id="btn-retry">Back to menu</button>
     </div>
   </section>
+
+  <div class="overlay" id="ach-overlay" hidden>
+    <div class="card">
+      <h2>🏆 Achievements</h2>
+      <div class="ach-list" id="ach-list"></div>
+      <button class="btn btn-ghost" id="btn-ach-close">Close</button>
+    </div>
+  </div>
 </div>
 
 <script src="data/tuning.js"></script>
 <script src="data/characters.js"></script>
-<script src="data/messages.js"></script>
+<script src="data/content_core.js"></script>
+<script src="data/threads_gender.js"></script>
+<script src="data/threads_politics.js"></script>
+<script src="data/threads_crew.js"></script>
+<script src="data/threads_more.js"></script>
 <script src="data/end_states.js"></script>
+<script src="js/avatars.js"></script>
 <script src="js/game_state.js"></script>
+<script src="js/audio.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>
